@@ -1,21 +1,51 @@
-from vlm import VLM, OpenAIVLM
+from vlm import VLM, OpenAIVLM, AnthropicVLM
+import argparse
 
-# Initialize the VLM with OpenAI implementation
-vlm = OpenAIVLM(model="gpt-4o-mini")
 
-# Analyze URL images
-images = [
-    # VLM.from_url("https://example.com/image1.jpg"),
-    VLM.from_file("./cat.png"),
-]
+def main():
+    # CLI for model selection only
+    parser = argparse.ArgumentParser(description="Test VLM implementations")
+    parser.add_argument(
+        "--provider",
+        "-p",
+        choices=["openai", "anthropic"],
+        # default="anthropic",
+        required=True,
+        help="Choose VLM provider",
+    )
+    args = parser.parse_args()
 
-# Or use local images
-# local_image = VLM.from_file("path_to_your_image.jpg")
+    img_path = "images/3-boxes-different-sizes.png"
+    system_prompt = "You are a helpful assistant. You need to help the user using a robotic arm to solve a puzzle."
+    test_prompt = "What do you see in the image? If we need to stack the boxes, which box should we pick first? Please describe the box and its position in detail and format your response as JSON."
 
-# Analyze images
-response = vlm.analyze(
-    prompt="What is in the image?",
-    images=images,
-)
+    # Test configuration
+    test_images = [
+        VLM.from_file(img_path),
+        # VLM.from_url("https://example.com/image1.jpg"),  # Uncomment to test URL
+    ]
 
-print(response)
+    try:
+        # Initialize VLM based on provider
+        if args.provider == "anthropic":
+            vlm = AnthropicVLM(model="claude-3-5-sonnet-20241022")
+        else:
+            vlm = OpenAIVLM(model="gpt-4o-mini")
+
+        # Run analysis
+        print(f"\nUsing provider: {args.provider}")
+        print("\nAnalyzing images...")
+
+        response = vlm.analyze(
+            prompt=test_prompt, images=test_images, system_prompt=system_prompt
+        )
+
+        print("\nResponse:")
+        print(response.text)
+
+    except Exception as e:
+        print(f"\nError: {str(e)}")
+
+
+if __name__ == "__main__":
+    main()
