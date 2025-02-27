@@ -45,15 +45,15 @@ class OpenAIVLM(VLMBase):
 
         user_message = {"role": "user", "content": [{"type": "text", "text": prompt}]}
 
-        # for image in images:
-        #     image_content = {
-        #         "type": "image_url",
-        #         "image_url": {
-        #             "url": image.get("url")
-        #             or f"data:image/jpeg;base64,{image['base64']}"
-        #         },
-        #     }
-        #     user_message["content"].append(image_content)
+        for image in images:
+            image_content = {
+                "type": "image_url",
+                "image_url": {
+                    "url": image.get("url")
+                    or f"data:image/jpeg;base64,{image['base64']}"
+                },
+            }
+            user_message["content"].append(image_content)
 
         messages.append(user_message)
 
