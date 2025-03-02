@@ -165,25 +165,6 @@ def get_latest_response(thread_id):
         print("❌Error retrieving latest response:", str(e))
 
 
-# def upload_image(image_path):
-#     """Uploads an image to OpenAI's file API for vision processing."""
-#     try:
-#         if not os.path.exists(image_path):
-#             print(f"Error: File '{image_path}' not found.")
-#             return None
-
-#         with open(image_path, "rb") as image_file:
-#             uploaded_file = client.files.create(
-#                 file=image_file,
-#                 purpose="assistants"
-#             )
-#         print(f"Image uploaded successfully. File ID: {uploaded_file.id}")
-#         return uploaded_file.id
-#     except Exception as e:
-#         print("Error uploading image:", str(e))
-#         return None
-
-
 def upload_image_from_memory(uploaded_file):
     """Uploads an image to OpenAI from memory with a proper filename."""
     try:
@@ -216,15 +197,6 @@ def upload_image_from_memory(uploaded_file):
         print("❌Error uploading image:", str(e))
         return None
 
-
-# === Streamlit GUI Integration ===
-# import streamlit as st
-# from PIL import Image
-
-# === Streamlit GUI Integration ===
-
-
-# === Streamlit GUI Integration ===
 
 # === Streamlit GUI Integration ===
 
