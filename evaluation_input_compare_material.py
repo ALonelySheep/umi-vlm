@@ -10,6 +10,13 @@ import base64
 import matplotlib.pyplot as plt
 import copy
 import io
+import cv2
+import random
+
+"""
+Usage Example:
+python evaluation_input_compare_material.py -p openai -i image -f True
+"""
 
 def load_audio_files(audio_dir):
     """
@@ -120,14 +127,15 @@ def visualize_reference_test_spectrograms(reference_spectrograms, test_spectrogr
     Given reference and test spectrograms, create visualizations.
     Returns:
         - Reference grid figure (1x3)
-        - List of individual test spectrogram figures
+        - List of individual test spectrogram figures (shuffled)
+        - List of true labels (shuffled)
     """
-    # Create figure for reference spectrograms (1x3 grid)
-    fig_ref = plt.figure(figsize=(15, 5))
+    # Create individual figures for reference spectrograms
+    ref_base64_list = []
+    class_names = ["Plastic", "Fabric", "Paper"]
     
-    # Plot reference spectrograms
-    for i, ref_spec in enumerate(reference_spectrograms, 1):
-        plt.subplot(1, 3, i)
+    for i, ref_spec in enumerate(reference_spectrograms):
+        fig = plt.figure(figsize=(5, 5))
         librosa.display.specshow(
             ref_spec,
             sr=sample_rate,
@@ -135,16 +143,29 @@ def visualize_reference_test_spectrograms(reference_spectrograms, test_spectrogr
             y_axis='linear',
             cmap='viridis'
         )
-        plt.title(f'{["Plastic", "Fabric", "Paper"][i-1]}')
+        plt.title(f'{class_names[i]}')
         plt.xlabel('Time')
         plt.ylabel('Frequency')
-    
-    plt.tight_layout()
-    
-    # Create individual figures for test spectrograms
-    test_figs = []
+        plt.tight_layout()
+        
+        # Convert to base64
+        buf = io.BytesIO()
+        fig.savefig(buf, format='png', bbox_inches='tight')
+        buf.seek(0)
+        base64_str = base64.b64encode(buf.read()).decode('utf-8')
+        ref_base64_list.append({
+            "base64": base64_str,
+            "media_type": "image/png"
+        })
+        
+        if not plot_spectrograms:
+            plt.close(fig)
+
+    # ... existing code for test spectrograms ...
+    true_labels = []
+    test_base64_list = []
+
     for i, test_spec in enumerate(test_spectrograms):
-        # Create new figure for each test spectrogram
         fig = plt.figure(figsize=(5, 5))
         
         librosa.display.specshow(
@@ -155,49 +176,32 @@ def visualize_reference_test_spectrograms(reference_spectrograms, test_spectrogr
             cmap='viridis'
         )
         
-        # Determine class based on index
-        class_idx = i // 4  # Every 4 samples belong to same class
-        class_name = ["Plastic", "Fabric", "Paper"][class_idx]
-        plt.title(f'Test {i+1}: {class_name}')
+        class_idx = i // 4
+        class_name = class_names[class_idx]
+        true_labels.append(class_name)
+
+        plt.title(f'Test Spectrogram')
         plt.xlabel('Time')
         plt.ylabel('Frequency')
-        
         plt.tight_layout()
-        test_figs.append(fig)
-        
-        # Close figure to free memory if not displaying
-        if not plot_spectrograms:
-            plt.close(fig)
-    
-    # Show figures if requested
-    if plot_spectrograms:
-        plt.show()
-    else:
-        plt.close(fig_ref)
-    
-    # Convert figures to base64 for VLM
-    def fig_to_base64(fig):
+
         buf = io.BytesIO()
         fig.savefig(buf, format='png', bbox_inches='tight')
         buf.seek(0)
-        return base64.b64encode(buf.read()).decode('utf-8')
-    
-    # Convert reference figure to base64
-    ref_base64 = fig_to_base64(fig_ref)
-    
-    # Convert test figures to base64
-    test_base64_list = []
-    for fig in test_figs:
+        base64_str = base64.b64encode(buf.read()).decode('utf-8')
         test_base64_list.append({
-            "base64": fig_to_base64(fig),
+            "base64": base64_str,
             "media_type": "image/png"
         })
+        
+        if not plot_spectrograms:
+            plt.close(fig)
     
-    # Return reference image and list of test images
-    return (
-        {"base64": ref_base64, "media_type": "image/png"},
-        test_base64_list
-    )
+    if plot_spectrograms:
+        plt.show()
+    
+    return ref_base64_list, test_base64_list, true_labels
+
 
 
 def main():
@@ -206,15 +210,17 @@ def main():
     parser.add_argument("--provider", "-p", choices=["openai", "anthropic"], default="anthropic",  help="Choose VLM provider")
     parser.add_argument("--input", "-i", choices=["text", "image", "audio"], default="text",  help="Choose input type")
     parser.add_argument("--visualize", "-v", default=False, help="Visualize the data")
+    parser.add_argument("--fewshot", "-f", default=True, help="Use fewshot prompt")
     args = parser.parse_args()
 
     #path to audio files
-    audio_dir = "/home/mark/github/umi-vlm/data"
+    audio_dir = "/home/mark/github/umi-vlm/data/audios"
     #load audio data from dir
     audio_data, sample_rate, reference_audio_data, test_audio_data = load_audio_files(audio_dir)
 
     #print dimension of audio data
     # print(f"len: {len(audio_data)}, audio_data[0].shape: {audio_data[0].shape}")
+    
     # sys.exit(0)
     
     #extract audio features from audio data depending on argument input {text, image, audio}
@@ -226,7 +232,7 @@ def main():
         spectrograms_test = extract_spectrogram(test_audio_data, sample_rate)
 
         # Get base64 encoded images for VLM
-        ref_image, test_images = visualize_reference_test_spectrograms(
+        ref_images, test_images, true_labels = visualize_reference_test_spectrograms(
             spectrograms_reference, 
             spectrograms_test, 
             sample_rate,
@@ -234,7 +240,8 @@ def main():
         )
 
         # Combine all images for VLM
-        image_inputs = [ref_image] + test_images
+        image_inputs_fewshot = ref_images + test_images
+        image_inputs_zero_shot = test_images
 
 
     elif args.input == "audio":
@@ -254,15 +261,30 @@ def main():
     system_prompt = "You are a helpful assistant with expertise in recognizing patterns and identifying classes based on visual representations of audio data."
 
     # Combine the prompts with image placeholders
-    combined_prompt = '''
+    fewshot_prompt = '''
 Your task is to analyze spectrograms, which are visual representations of the frequency spectrum of sound over time, and to determine the most likely sound class for a given spectrogram.
 I will show you several spectrogram visualizations:
 
-First image shows reference spectrograms for three classes: Plastic (left), Fabric (middle), Paper (right).
+First three image shows reference spectrograms for three classes: Plastic (first), Fabric (second), Paper (third).
 
 The following 12 images are individual test spectrograms that need to be classified. For each test spectrogram, analyze it considering factors such as frequency patterns, intensity, and time variations. Focus solely on the patterns presented in the spectrogram.
 
-Please provide your classification for ALL 12 test spectrograms in the following format:
+Please provide your classification for ALL test spectrograms in the following format:
+
+Test 1: [class]
+Test 2: [class]
+Test 3: [class]
+...and so on until Test 12.
+
+For each classification, use ONLY one of these exact class names: Plastic, Fabric, or Paper.
+'''
+
+    zero_shot_prompt = '''
+Your task is to analyze spectrograms, which are visual representations of the frequency spectrum of sound over time, and to determine the most likely sound class for a given spectrogram.
+
+The following 12 images are individual test spectrograms that need to be classified. For each test spectrogram, analyze it considering factors such as frequency patterns, intensity, and time variations. Focus solely on the patterns presented in the spectrogram.
+
+Please provide your classification for ALL test spectrograms in the following format:
 
 Test 1: [class]
 Test 2: [class]
@@ -270,15 +292,32 @@ Test 3: [class]
 ...and so on until Test 12
 
 For each classification, use ONLY one of these exact class names: Plastic, Fabric, or Paper.
+
 '''
+    print(f"args.fewshot: {args.fewshot}")
+    # Select the appropriate input and prompt based on the fewshot flag
+    if args.fewshot == "True":
+        print(f"Using fewshot prompt")
+        print(f"image_inputs_fewshot: {len(image_inputs_fewshot)}")
+        image_inputs = image_inputs_fewshot
+        input_prompt = fewshot_prompt
+    elif args.fewshot == "False":
+        print(f"Using zero-shot prompt")
+        print(f"image_inputs_zero_shot: {len(image_inputs_zero_shot)}")
+        image_inputs = image_inputs_zero_shot
+        input_prompt = zero_shot_prompt
 
 
     try:
         # Initialize VLM based on provider
         if args.provider == "anthropic":
-            vlm = AnthropicVLM(model="claude-3-5-sonnet-20241022")
+            vlm = AnthropicVLM(model="claude-3-7-sonnet-20250219") #high-end model
+            # vlm = AnthropicVLM(model="claude-3-5-haiku-20241022") #low-end model
+
+            
         else:
-            vlm = OpenAIVLM(model="gpt-4o")
+            vlm = OpenAIVLM(model="gpt-4o") #high-end model
+            # vlm = OpenAIVLM(model="gpt-4o-mini") #low-end model
 
         # Run analysis
         print(f"\nUsing provider: {args.provider}")
@@ -289,10 +328,6 @@ For each classification, use ONLY one of these exact class names: Plastic, Fabri
         for i, image in enumerate(image_inputs):
             # Decode base64 string to bytes
             img_bytes = base64.b64decode(image['base64'])
-            
-            # Convert bytes to numpy array using cv2 or PIL
-            import cv2
-            import numpy as np
             
             # Convert bytes to numpy array
             nparr = np.frombuffer(img_bytes, np.uint8)
@@ -305,7 +340,7 @@ For each classification, use ONLY one of these exact class names: Plastic, Fabri
         
         # ***** Send all images and combined prompt to VLM *****
         response = vlm.analyze(
-            prompt=combined_prompt,
+            prompt=input_prompt,
             images=image_inputs,
             system_prompt=system_prompt
         )
@@ -313,6 +348,27 @@ For each classification, use ONLY one of these exact class names: Plastic, Fabri
 
         print("\nResponse:")
         print(response.text)
+
+        # Calculate and display accuracy
+        def extract_predictions(response_text):
+            predictions = []
+            for line in response_text.split('\n'):
+                if line.startswith('Test'):
+                    # Extract the class name after the colon
+                    pred = line.split(':')[1].strip()
+                    predictions.append(pred)
+            return predictions
+
+        predictions = extract_predictions(response.text)
+        
+        # Calculate accuracy
+        correct = sum(1 for pred, true in zip(predictions, true_labels) if pred == true)
+        accuracy = correct / len(true_labels)
+        
+        print("\nResults:")
+        print("True labels:", true_labels)
+        print("Predictions:", predictions)
+        print(f"Accuracy: {accuracy:.2%}")
 
     except Exception as e:
         print(f"\nError: {str(e)}")
