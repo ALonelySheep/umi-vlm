@@ -1,6 +1,20 @@
 import openai
 import time
 import os
+import json
+
+# Custom mock functions for assistant function calling
+
+
+def get_current_temperature(location, unit):
+    """Mock function to get the current temperature for a specific location."""
+    return f"The temperature in {location} is 22 degrees {unit}."
+
+
+def get_rain_probability(location):
+    """Mock function to get the probability of rain for a specific location."""
+    return f"The probability of rain in {location} is 10%."
+
 
 # Initialize a single OpenAI client instance
 client = openai.OpenAI()
@@ -12,7 +26,40 @@ def create_assistant(system_prompt="You are a helpful assistant."):
         assistant = client.beta.assistants.create(
             name="Math Tutor",
             instructions=system_prompt,
-            tools=[{"type": "code_interpreter"}],
+            tools=[
+                {"type": "code_interpreter"},
+                # Adding custom function calling tools
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "get_current_temperature",
+                        "description": "Get the current temperature for a specific location",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "location": {"type": "string", "description": "The city and state, e.g., San Francisco, CA"},
+                                "unit": {"type": "string", "enum": ["Celsius", "Fahrenheit"], "description": "The temperature unit to use."}
+                            },
+                            "required": ["location", "unit"]
+                        }
+                    }
+                },
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "get_rain_probability",
+                        "description": "Get the probability of rain for a specific location",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "location": {"type": "string", "description": "The city and state, e.g., San Francisco, CA"}
+                            },
+                            "required": ["location"]
+                        }
+                    }
+                }
+
+            ],
             model="gpt-4o-mini"
         )
         print("Assistant created:", assistant.id)
@@ -94,14 +141,32 @@ def run_assistant(thread_id, assistant_id):
             instructions="Please address the user as Jane Doe. The user has a premium account."
         )
 
+        if run.status == "requires_action":
+            tool_outputs = []
+            print(f"Run requires action: {run.required_action}")
+            for tool_call in run.required_action.submit_tool_outputs.tool_calls:
+                function_name = tool_call.function.name
+                arguments = json.loads(tool_call.function.arguments)
+
+                if function_name == "get_current_temperature":
+                    output = get_current_temperature(
+                        arguments["location"], arguments["unit"])
+                elif function_name == "get_rain_probability":
+                    output = get_rain_probability(arguments["location"])
+                else:
+                    output = "Unknown function call"
+
+                tool_outputs.append(
+                    {"tool_call_id": tool_call.id, "output": output})
+
+            run = client.beta.threads.runs.submit_tool_outputs_and_poll(
+                thread_id=thread_id,
+                run_id=run.id,
+                tool_outputs=tool_outputs
+            )
+
         if run.status == "completed":
             print("Run completed successfully.")
-        elif run.status == "requires_action":
-            print("Run requires action before proceeding.")
-        elif run.status == "expired":
-            print("Run expired before completion.")
-        elif run.status == "failed":
-            print("Run failed. Reason:", run.last_error)
         else:
             print("Run ended with status:", run.status)
 
