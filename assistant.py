@@ -4,16 +4,14 @@ import os
 import json
 
 # Custom mock functions for assistant function calling
+# ! NOTE: the request will time out after roughly 10 mins,
+# ! This might casue a problem when using diffusion policy
 
 
-def get_current_temperature(location, unit):
-    """Mock function to get the current temperature for a specific location."""
-    return f"The temperature in {location} is 22 degrees {unit}."
-
-
-def get_rain_probability(location):
-    """Mock function to get the probability of rain for a specific location."""
-    return f"The probability of rain in {location} is 10%."
+def move_object(cube_color):
+    """Mock function to move an object of a specific color."""
+    print(f"[Simulating...] Moving the {cube_color} cube.")
+    return f"Moving the {cube_color} cube."
 
 
 # Initialize a single OpenAI client instance
@@ -29,35 +27,26 @@ def create_assistant(system_prompt="You are a helpful assistant."):
             tools=[
                 {"type": "code_interpreter"},
                 # Adding custom function calling tools
+                # See https://platform.openai.com/docs/guides/structured-outputs#examples
+                # for details on JSON schema
                 {
                     "type": "function",
                     "function": {
-                        "name": "get_current_temperature",
-                        "description": "Get the current temperature for a specific location",
+                        "name": "move_object",
+                        "description": "Use a robotic arm to move an object.",
                         "parameters": {
                             "type": "object",
                             "properties": {
-                                "location": {"type": "string", "description": "The city and state, e.g., San Francisco, CA"},
-                                "unit": {"type": "string", "enum": ["Celsius", "Fahrenheit"], "description": "The temperature unit to use."}
+                                "cube_color": {
+                                    "type": "string",
+                                    "enum": ["red", "green", "blue"],
+                                    "description": "The color of the cube to move."
+                                }
                             },
-                            "required": ["location", "unit"]
+                            "required": ["cube_color"]
                         }
                     }
                 },
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "get_rain_probability",
-                        "description": "Get the probability of rain for a specific location",
-                        "parameters": {
-                            "type": "object",
-                            "properties": {
-                                "location": {"type": "string", "description": "The city and state, e.g., San Francisco, CA"}
-                            },
-                            "required": ["location"]
-                        }
-                    }
-                }
 
             ],
             model="gpt-4o-mini"
@@ -148,11 +137,8 @@ def run_assistant(thread_id, assistant_id):
                 function_name = tool_call.function.name
                 arguments = json.loads(tool_call.function.arguments)
 
-                if function_name == "get_current_temperature":
-                    output = get_current_temperature(
-                        arguments["location"], arguments["unit"])
-                elif function_name == "get_rain_probability":
-                    output = get_rain_probability(arguments["location"])
+                if function_name == "move_object":
+                    output = move_object(arguments["cube_color"])
                 else:
                     output = "Unknown function call"
 
@@ -200,7 +186,7 @@ def multi_round_conversation(assistant_id, thread_id):
             print("Ending conversation.")
             break
         add_message_to_thread(
-            thread_id, user_input, image_path='./data/images/cat.jpg', image_quality="auto")
+            thread_id, user_input, image_path='./data/images/3-boxes-same-sizes.png', image_quality="auto")
         run_assistant(thread_id, assistant_id)
         get_latest_response(thread_id)
 
