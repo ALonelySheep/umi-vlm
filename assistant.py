@@ -54,7 +54,7 @@ def create_assistant(system_prompt="You are a helpful assistant."):
                     }
                 },
             ],
-            model="gpt-4o-mini"
+            model="gpt-4o"
         )
         print("✅Assistant created:", assistant.id)
         return assistant
@@ -109,17 +109,19 @@ def add_message_to_thread(thread_id, message, image_id=None, detail="auto"):
 
 
 def run_assistant(thread_id, assistant_id):
-    """Runs the assistant and handles different run states."""
+    """Runs the assistant and handles multiple sequential action calls in a single run."""
     try:
+        # Start the run once
         run = client.beta.threads.runs.create_and_poll(
             thread_id=thread_id,
             assistant_id=assistant_id,
-            instructions="Please address the user as Jane Doe. The user has a premium account."
         )
 
-        if run.status == "requires_action":
+        # Keep handling actions if assistant requires them
+        while run.status == "requires_action":
             tool_outputs = []
-            print(f"🤖Run requires action: {run.required_action}")
+            print(f"🤖 Run requires action: {run.required_action}")
+
             for tool_call in run.required_action.submit_tool_outputs.tool_calls:
                 function_name = tool_call.function.name
                 arguments = json.loads(tool_call.function.arguments)
@@ -130,22 +132,26 @@ def run_assistant(thread_id, assistant_id):
                     output = "Unknown function call"
 
                 tool_outputs.append(
-                    {"tool_call_id": tool_call.id, "output": output})
+                    {"tool_call_id": tool_call.id, "output": output}
+                )
 
+            # Submit tool outputs and poll again
             run = client.beta.threads.runs.submit_tool_outputs_and_poll(
                 thread_id=thread_id,
                 run_id=run.id,
                 tool_outputs=tool_outputs
             )
 
+        # Run completed successfully
         if run.status == "completed":
-            print("✅Run completed successfully.")
+            print("✅ Run completed successfully.")
         else:
-            print("❌Run ended with status:", run.status)
+            print(f"❌ Run ended with status: {run.status}")
 
         return run
+
     except Exception as e:
-        print("❌Error running assistant:", str(e))
+        print(f"❌ Error running assistant: {str(e)}")
         return None
 
 
@@ -187,7 +193,8 @@ def upload_image_from_memory(uploaded_file):
         # Upload directly from memory with correct filename
         uploaded_file = client.files.create(
             file=file_like_object,
-            purpose="assistants"
+            purpose="vision",
+            # purpose="assistants",
         )
 
         print(f"🟦Image uploaded successfully. File ID: {uploaded_file.id}")
@@ -204,7 +211,7 @@ def chatbot_ui():
     """Streamlit-based graphical user interface for interacting with the assistant."""
     st.set_page_config(page_title="AI Chatbot", layout="wide")  # Set UI layout
 
-    st.title("🤖 AI Assistant Chatbot")
+    st.title("🤖 UuUuuUUUuuUUuUUUuMi")
 
     # Set up session state for storing conversation history and metadata
     if "messages" not in st.session_state:
