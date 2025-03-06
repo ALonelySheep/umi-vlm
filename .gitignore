@@ -176,5 +176,3 @@ cython_debug/
 .DS_Store
 
 data/logs/*
-
-data/images/blenderRGBboxes
