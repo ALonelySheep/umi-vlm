@@ -1,0 +1,30 @@
+{
+    "Task Action": "Stack",
+    "Task Description": "Mass",
+    "Object Property Variations": [
+        "Color",
+        "Volume",
+        "Mass"
+    ],
+    "Object Property Pattern": [
+        "Mass",
+        "Volume"
+    ],
+    "Subproperties": {
+        "Color": [
+            "red",
+            "blue",
+            "green"
+        ],
+        "Volume": [
+            "small",
+            "medium",
+            "large"
+        ],
+        "Mass": [
+            "1kg",
+            "3kg",
+            "5kg"
+        ]
+    }
+}
