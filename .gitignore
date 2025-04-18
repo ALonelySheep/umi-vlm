@@ -180,3 +180,5 @@ data/logs/*
 data/images/captures
 
 sim_environment_persistent/client/images
+
+sim_environment/outputs
