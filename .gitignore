@@ -178,3 +178,5 @@ cython_debug/
 data/logs/*
 
 data/images/captures
+
+sim_environment_persistent/client/images
