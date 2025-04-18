@@ -28,11 +28,11 @@ Output:
 # ----------------------------
 # Config & Constants
 # ----------------------------
-CONFIG_PATH = "/home/mark/isaacsim/umi_examples/config.json"
+CONFIG_PATH = "./sim_environment/config.json"
 
 # Create timestamped directory
 timestamp = datetime.now().strftime("%m-%d-%H-%M")
-output_dir = os.path.join("/home/mark/isaacsim/umi_examples/outputs", timestamp)
+output_dir = os.path.join("./sim_environment/outputs", timestamp)
 os.makedirs(output_dir, exist_ok=True)
 OUTPUT_JSON_PATH = os.path.join(output_dir, "environment_objects.json")
 OUTPUT_IMAGE_PATH = os.path.join(output_dir, "camera_views_grid.png")
