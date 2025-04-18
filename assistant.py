@@ -8,6 +8,11 @@ import json
 import streamlit as st
 from PIL import Image
 import io  # <-- Import for handling in-memory byte streams
+from dotenv import load_dotenv
+import os
+
+# Load the .env file
+load_dotenv()
 
 # Custom mock functions for assistant function calling
 # ! NOTE: the request will time out after roughly 10 mins,
